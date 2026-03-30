@@ -1,0 +1,166 @@
+local player = game.Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Get HRP safely
+local function getHRP()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart", 5) -- waits max 5 sec
+	if not hrp then
+		warn("HumanoidRootPart not found! Invisible?")
+		return nil
+	end
+	return hrp
+end
+
+-- GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "TeleportUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Menu Button
+local menuBtn = Instance.new("TextButton")
+menuBtn.Size = UDim2.new(0, 50, 0, 50)
+menuBtn.Position = UDim2.new(0, 20, 0, 100)
+menuBtn.Text = "☰"
+menuBtn.TextScaled = true
+menuBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+menuBtn.TextColor3 = Color3.new(1,1,1)
+menuBtn.Parent = gui
+
+-- Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 180, 0, 200)
+frame.Position = UDim2.new(0, 20, 0, 160)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Visible = false
+frame.Parent = gui
+
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0, 12)
+
+-- Button maker
+local function makeBtn(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, -20, 0, 40)
+	b.Position = UDim2.new(0, 10, 0, y)
+	b.Text = text
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextScaled = true
+	b.Parent = frame
+	
+	local c = Instance.new("UICorner", b)
+	c.CornerRadius = UDim.new(0, 8)
+	
+	return b
+end
+
+-- Buttons
+local pos1Btn = makeBtn("Set Pos 1", 10)
+local pos2Btn = makeBtn("Set Pos 2", 60)
+local resetBtn = makeBtn("Reset", 120)
+
+-- Positions
+local pos1, pos2 = nil, nil
+
+-- Tween
+local function tween(obj, props)
+	local t = TweenService:Create(obj, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+	t:Play()
+end
+
+-- Menu toggle
+local open = false
+menuBtn.MouseButton1Click:Connect(function()
+	open = not open
+	if open then
+		frame.Visible = true
+		frame.Size = UDim2.new(0, 0, 0, 0)
+		tween(frame, {Size = UDim2.new(0, 180, 0, 200)})
+	else
+		tween(frame, {Size = UDim2.new(0, 0, 0, 0)})
+		task.wait(0.25)
+		frame.Visible = false
+	end
+end)
+
+-- Drag system
+do
+	local dragging = false
+	local startInputPos
+	local startBtnPos
+
+	menuBtn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			startInputPos = input.Position
+			startBtnPos = menuBtn.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+
+	menuBtn.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input == dragInput then
+			local delta = input.Position - startInputPos
+			local newPos = UDim2.new(
+				startBtnPos.X.Scale,
+				startBtnPos.X.Offset + delta.X,
+				startBtnPos.Y.Scale,
+				startBtnPos.Y.Offset + delta.Y
+			)
+			menuBtn.Position = newPos
+			frame.Position = UDim2.new(0, newPos.X.Offset, 0, newPos.Y.Offset + 60)
+		end
+	end)
+end
+
+-- Pos1
+pos1Btn.MouseButton1Click:Connect(function()
+	local hrp = getHRP()
+	if hrp then
+		if not pos1 then
+			pos1 = hrp.CFrame
+			pos1Btn.Text = "TP Pos 1"
+		else
+			hrp.CFrame = pos1
+		end
+	end
+end)
+
+-- Pos2
+pos2Btn.MouseButton1Click:Connect(function()
+	local hrp = getHRP()
+	if hrp then
+		if not pos2 then
+			pos2 = hrp.CFrame
+			pos2Btn.Text = "TP Pos 2"
+		else
+			hrp.CFrame = pos2
+		end
+	end
+end)
+
+-- Reset
+resetBtn.MouseButton1Click:Connect(function()
+	pos1 = nil
+	pos2 = nil
+	pos1Btn.Text = "Set Pos 1"
+	pos2Btn.Text = "Set Pos 2"
+end)
+
+-- Update after respawn
+player.CharacterAdded:Connect(function()
+	getHRP()
+end)
